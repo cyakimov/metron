@@ -1,0 +1,9 @@
+{
+  "rateLimits": {"limitId": "codex", "primary": {"usedPercent": 47, "windowDurationMins": 10080, "resetsAt": 1893758400}, "credits": {"balance": "15", "hasCredits": true, "unlimited": false}},
+  "rateLimitsByLimitId": {
+    "codex": {"primary": {"usedPercent": 47, "windowDurationMins": 10080, "resetsAt": 1893758400}, "secondary": null, "credits": {"balance": "15", "hasCredits": true, "unlimited": false}},
+    "codex_model": {"limitName": "Spark", "primary": {"usedPercent": 12, "windowDurationMins": 300, "resetsAt": 1893499200}, "credits": {"balance": "15", "hasCredits": true, "unlimited": false}, "individualLimit": {"used": "5", "limit": "20", "remainingPercent": 75, "resetsAt": 1893758400}}
+  },
+  "ordinaryUsageAllowed": false,
+  "rateLimitResetCredits": {"availableCount": 1, "credits": null}
+}

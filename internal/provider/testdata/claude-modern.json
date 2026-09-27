@@ -1,0 +1,12 @@
+{
+  "five_hour": {"utilization": 100, "resets_at": "2030-01-01T12:00:00.197442+00:00"},
+  "seven_day": {"utilization": 59, "resets_at": "2030-01-04T12:00:00Z"},
+  "nimbus_quill": {"utilization": 0, "resets_at": "2030-01-04T12:00:00Z"},
+  "limits": [
+    {"kind": "session", "group": "session", "percent": 100, "scope": null, "is_active": true, "resets_at": "2030-01-01T12:00:00.197442+00:00"},
+    {"kind": "weekly_all", "group": "weekly", "percent": 59, "scope": null, "is_active": false, "resets_at": "2030-01-04T12:00:00Z"},
+    {"kind": "weekly_scoped", "group": "weekly", "percent": 0, "scope": {"model": {"display_name": "Fable", "id": null}, "surface": null}, "is_active": false, "resets_at": "2030-01-04T12:00:00Z"}
+  ],
+  "extra_usage": {"is_enabled": false, "utilization": null},
+  "spend": {"enabled": false, "used": {"amount_minor": 0, "currency": "USD", "exponent": 2}, "limit": null, "balance": null, "percent": 0}
+}
