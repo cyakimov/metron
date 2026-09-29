@@ -40,10 +40,28 @@ Run `metron --help` for help or `metron --version` for the installed version.
 Use a pane of at least 28 columns and 8 rows.
 Set `NO_COLOR=1` to disable color.
 
+## Refresh intervals
+
+Claude refreshes every five minutes by default, and Codex every minute.
+Use `--refresh-interval` to set both, or `--claude-refresh-interval` and `--codex-refresh-interval` to set a platform individually.
+An explicit platform flag takes precedence over the global flag, regardless of argument order.
+Intervals must be positive Go durations, such as `30s`, `5m`, or `1h`.
+
+```sh
+metron --refresh-interval=2m
+metron --refresh-interval=2m --claude-refresh-interval=10m
+metron --claude-refresh-interval=10m --codex-refresh-interval=30s
+```
+
+The second example refreshes Claude every ten minutes and Codex every two minutes.
+Flags apply to the current run, and automatic scheduling has one-second resolution.
+The dashboard header shows the effective intervals when space permits.
+
 ## How it works
 
 Metron reads account wide usage, including activity from other devices and applications that share the provider's allowance.
-It fetches on startup and every 60 seconds, while reset countdowns update locally every second.
+It fetches both providers on startup, then refreshes each on its configured interval after the previous request completes.
+Reset countdowns update locally every second.
 Provider reporting may introduce additional delay.
 
 - **Claude:** the account OAuth usage endpoint, using Claude Code's existing credential file or macOS Keychain item.
@@ -57,6 +75,7 @@ Passing a reset time shows `reset pending` until a fresh provider response confi
 Bars turn yellow at 70% used and red at 90% used.
 After a failed request, the previous values remain visibly **stale**, with their age and a short error.
 Manual refresh respects provider retry delays.
+Automatic refresh also honors any provider retry deadline later than the configured interval.
 The last successful snapshot exists only for the current run.
 
 Metron does not create model conversations, redeem credits, or maintain a background service.

@@ -11,10 +11,9 @@ import (
 	"github.com/cyakimov/metron/internal/provider"
 )
 
-const interval = time.Minute
-
 type state struct {
 	provider provider.Provider
+	interval time.Duration
 	snapshot *provider.Snapshot
 	err      error
 	fetching bool
@@ -38,11 +37,11 @@ type resultMsg struct {
 	at       time.Time
 }
 
-func New(providers []provider.Provider) *Model {
+func New(providers []provider.Provider, intervals map[string]time.Duration) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Model{ctx: ctx, cancel: cancel, now: time.Now(), width: 80, height: 24, dark: true, color: os.Getenv("NO_COLOR") == ""}
 	for _, p := range providers {
-		m.states = append(m.states, state{provider: p})
+		m.states = append(m.states, state{provider: p, interval: intervals[p.ID()]})
 	}
 	return m
 }
@@ -90,7 +89,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s := &m.states[msg.index]
 		s.fetching = false
 		s.err = msg.err
-		s.nextPoll = msg.at.Add(interval)
+		s.nextPoll = msg.at.Add(s.interval)
 		if msg.err == nil {
 			s.snapshot = &msg.snapshot
 		} else {

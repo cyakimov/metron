@@ -54,8 +54,22 @@ func (m *Model) View() tea.View {
 	if width >= 60 {
 		left += "  " + m.style("account limits", "muted")
 	}
-	right := m.style("every 60s", "muted")
-	header := left + strings.Repeat(" ", max(1, width-ansi.StringWidth(left)-ansi.StringWidth(right))) + right
+	var cadences []string
+	for _, s := range m.states {
+		name := s.provider.ID()
+		switch name {
+		case "claude":
+			name = "Claude"
+		case "codex":
+			name = "Codex"
+		}
+		cadences = append(cadences, name+" "+refreshDuration(s.interval))
+	}
+	right := m.style(strings.Join(cadences, ", "), "muted")
+	header := left
+	if ansi.StringWidth(left)+1+ansi.StringWidth(right) <= width {
+		header += strings.Repeat(" ", width-ansi.StringWidth(left)-ansi.StringWidth(right)) + right
+	}
 	body := m.body()
 	start := min(m.offset, max(0, len(body)-m.bodyHeight()))
 	visible := append([]string(nil), body[start:min(len(body), start+m.bodyHeight())]...)
@@ -190,4 +204,14 @@ func age(d time.Duration) string {
 		return fmt.Sprintf("%ds", max(0, int(d.Seconds())))
 	}
 	return countdown(d)
+}
+
+func refreshDuration(d time.Duration) string {
+	if d%time.Hour == 0 {
+		return fmt.Sprintf("%dh", d/time.Hour)
+	}
+	if d%time.Minute == 0 {
+		return fmt.Sprintf("%dm", d/time.Minute)
+	}
+	return d.String()
 }

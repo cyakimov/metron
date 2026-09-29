@@ -21,7 +21,7 @@ func (p stubProvider) Fetch(context.Context) (provider.Snapshot, error) {
 
 func testModel(t *testing.T) *Model {
 	t.Helper()
-	m := New([]provider.Provider{stubProvider("claude"), stubProvider("codex")})
+	m := New([]provider.Provider{stubProvider("claude"), stubProvider("codex")}, map[string]time.Duration{"claude": 5 * time.Minute, "codex": time.Minute})
 	t.Cleanup(m.Close)
 	m.color = false
 	m.now = time.Date(2030, 1, 1, 10, 0, 0, 0, time.UTC)
@@ -95,6 +95,122 @@ func TestManualRefreshHonorsBackoffAndInFlightRequests(t *testing.T) {
 	_, cmd = m.Update(tea.KeyPressMsg{Code: 'r'})
 	if cmd == nil || m.states[0].fetching || !m.states[1].fetching {
 		t.Fatal("providers not refreshed independently")
+	}
+}
+
+func TestStartupFetchesBothProviders(t *testing.T) {
+	m := testModel(t)
+	if cmd := m.Init(); cmd == nil || !m.states[0].fetching || !m.states[1].fetching {
+		t.Fatal("startup did not fetch both providers immediately")
+	}
+}
+
+func TestAutomaticRefreshUsesProviderIntervals(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		claude, codex time.Duration
+	}{
+		{"defaults", 5 * time.Minute, time.Minute},
+		{"overrides", 30 * time.Second, 2 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, elapsed := range []time.Duration{tc.claude - time.Nanosecond, tc.claude, tc.codex - time.Nanosecond, tc.codex} {
+				m := testModel(t)
+				m.states[0].interval, m.states[1].interval = tc.claude, tc.codex
+				at := m.now.Add(15 * time.Second)
+				for i := range m.states {
+					m.Update(resultMsg{index: i, at: at, snapshot: *m.states[i].snapshot})
+					if want := at.Add(m.states[i].interval); !m.states[i].nextPoll.Equal(want) {
+						t.Fatalf("%s next poll = %s, want %s", m.states[i].provider.ID(), m.states[i].nextPoll, want)
+					}
+				}
+				m.Update(tickMsg(at.Add(elapsed)))
+				for _, s := range m.states {
+					if want := elapsed >= s.interval; s.fetching != want {
+						t.Errorf("at %s: %s fetching = %t, want %t", elapsed, s.provider.ID(), s.fetching, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestAutomaticRefreshHonorsRetryDeadlines(t *testing.T) {
+	for _, delay := range []time.Duration{2 * time.Minute, 10 * time.Minute} {
+		m := testModel(t)
+		at := m.now
+		m.Update(resultMsg{index: 0, at: at, err: &provider.Problem{Message: "Slow down", RetryAt: at.Add(delay)}})
+		want := at.Add(max(delay, m.states[0].interval))
+		if !m.states[0].nextPoll.Equal(want) {
+			t.Fatalf("next poll = %s, want %s", m.states[0].nextPoll, want)
+		}
+		m.Update(tickMsg(want.Add(-time.Nanosecond)))
+		if m.states[0].fetching {
+			t.Fatal("Claude fetched before its retry deadline")
+		}
+		m.Update(tickMsg(want))
+		if !m.states[0].fetching {
+			t.Fatal("Claude did not fetch at its retry deadline")
+		}
+	}
+}
+
+func TestAutomaticRefreshDoesNotOverlapInFlightRequests(t *testing.T) {
+	m := testModel(t)
+	first := m.poll(0)
+	if first == nil {
+		t.Fatal("initial poll missing")
+	}
+	m.Update(tickMsg(m.now.Add(time.Hour)))
+	if cmd := m.poll(0); cmd != nil {
+		t.Fatal("scheduled refresh allowed an overlapping request")
+	}
+	m.Update(first())
+	if m.states[0].fetching {
+		t.Fatal("in-flight state survived request completion")
+	}
+}
+
+func TestManualRefreshCanFetchBeforeAutomaticDeadline(t *testing.T) {
+	m := testModel(t)
+	for i := range m.states {
+		m.states[i].nextPoll = time.Now().Add(time.Hour)
+	}
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'r'})
+	if cmd == nil || !m.states[0].fetching || !m.states[1].fetching {
+		t.Fatal("manual refresh waited for the automatic deadline")
+	}
+}
+
+func TestHeaderShowsEffectiveRefreshIntervals(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		width         int
+		claude, codex time.Duration
+		label         string
+	}{
+		{"defaults at minimum width", 28, 5 * time.Minute, time.Minute, "Claude 5m, Codex 1m"},
+		{"custom", 80, 10 * time.Minute, 30 * time.Second, "Claude 10m, Codex 30s"},
+		{"equal", 80, 2 * time.Minute, 2 * time.Minute, "Claude 2m, Codex 2m"},
+		{"hours and fractions", 120, time.Hour, time.Millisecond, "Claude 1h, Codex 1ms"},
+		{"narrow custom", 28, 90 * time.Second, 30 * time.Second, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := testModel(t)
+			m.width = tc.width
+			m.states[0].interval, m.states[1].interval = tc.claude, tc.codex
+			header := strings.Split(ansi.Strip(m.View().Content), "\n")[0]
+			if tc.label == "" {
+				if strings.TrimSpace(header) != "metron" {
+					t.Fatalf("narrow header = %q, want title only", header)
+				}
+			} else if !strings.Contains(header, tc.label) {
+				t.Fatalf("header = %q, want %q", header, tc.label)
+			}
+			if ansi.StringWidth(header) > tc.width || strings.Contains(header, "…") {
+				t.Fatalf("header clipped or overflowed: %q", header)
+			}
+		})
 	}
 }
 
