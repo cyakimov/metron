@@ -32,6 +32,7 @@ API-key billing is separate from subscription limits.
 | Key | Action |
 | --- | --- |
 | `r` | Refresh both providers |
+| `a` | Pause or resume animations |
 | `q` / Ctrl-C | Quit |
 | ↑ / ↓ / `j` / `k` | Scroll when the dashboard does not fit |
 | Page Up / Page Down / Home / End | Navigate a long dashboard |
@@ -39,6 +40,16 @@ API-key billing is separate from subscription limits.
 Run `metron --help` for help or `metron --version` for the installed version.
 Use a pane of at least 28 columns and 8 rows.
 Set `NO_COLOR=1` to disable color.
+Run `metron --no-motion` to start with animations paused.
+
+The cosmic observer scans during refreshes, acknowledges successful updates, and reacts to quota pressure or unavailable providers.
+Larger panes show the observer beside the title and frame each provider's limits.
+Smaller panes use a compact layout with the same data and controls.
+Animations never change reported percentages or provider refresh intervals.
+Open background space contains slowly twinkling stars and occasional comets.
+At 70% used, a brief amber ripple accompanies the affected provider's pulsing border; at 90%, a red meteor burst takes over.
+The highest available usage tier sets the cadence for these two-second reminders: every 30 seconds at 70% or every 20 seconds at 90%.
+Paused motion leaves a static starfield, and small panes prioritize account data over travelling effects.
 
 ## Refresh intervals
 

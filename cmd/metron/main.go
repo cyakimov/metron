@@ -37,7 +37,7 @@ func run() int {
 	}
 	codex := provider.NewCodex(version)
 	defer codex.Close()
-	model := dashboard.New([]provider.Provider{provider.NewClaude(), codex}, opts.refreshIntervals)
+	model := dashboard.New([]provider.Provider{provider.NewClaude(), codex}, opts.refreshIntervals, !opts.noMotion)
 	defer model.Close()
 	if _, err := tea.NewProgram(model).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "metron: terminal dashboard stopped unexpectedly")
@@ -48,6 +48,7 @@ func run() int {
 
 type options struct {
 	showVersion      bool
+	noMotion         bool
 	refreshIntervals map[string]time.Duration
 }
 
@@ -55,11 +56,12 @@ func parseOptions(args []string, output io.Writer) (options, error) {
 	flags := flag.NewFlagSet("metron", flag.ContinueOnError)
 	flags.SetOutput(output)
 	showVersion := flags.Bool("version", false, "print version")
+	noMotion := flags.Bool("no-motion", false, "disable animations; press a to toggle motion")
 	refreshInterval := flags.Duration("refresh-interval", 0, "refresh `duration` for both platforms; platform flags take precedence")
 	claudeInterval := flags.Duration("claude-refresh-interval", 5*time.Minute, "Claude refresh `duration`; overrides --refresh-interval")
 	codexInterval := flags.Duration("codex-refresh-interval", time.Minute, "Codex refresh `duration`; overrides --refresh-interval")
 	flags.Usage = func() {
-		fmt.Fprintln(output, "Metron - live Claude and Codex account limits\n\nUsage: metron [options]\n\nKeys: r refresh, q quit, arrows scroll\n\nUses your existing Claude Code and Codex sign-ins.\nDefaults: Claude every 5 minutes, Codex every minute.\nIntervals must be positive durations, such as 30s, 5m, or 1h.")
+		fmt.Fprintln(output, "Metron - live Claude and Codex account limits\n\nUsage: metron [options]\n\nKeys: r refresh, a toggle motion, q quit, arrows scroll\n\nUses your existing Claude Code and Codex sign-ins.\nDefaults: Claude every 5 minutes, Codex every minute.\nIntervals must be positive durations, such as 30s, 5m, or 1h.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -99,5 +101,5 @@ func parseOptions(args []string, output io.Writer) (options, error) {
 	if supplied["codex-refresh-interval"] {
 		intervals["codex"] = *codexInterval
 	}
-	return options{showVersion: *showVersion, refreshIntervals: intervals}, nil
+	return options{showVersion: *showVersion, noMotion: *noMotion, refreshIntervals: intervals}, nil
 }

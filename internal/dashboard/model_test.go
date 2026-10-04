@@ -21,7 +21,7 @@ func (p stubProvider) Fetch(context.Context) (provider.Snapshot, error) {
 
 func testModel(t *testing.T) *Model {
 	t.Helper()
-	m := New([]provider.Provider{stubProvider("claude"), stubProvider("codex")}, map[string]time.Duration{"claude": 5 * time.Minute, "codex": time.Minute})
+	m := New([]provider.Provider{stubProvider("claude"), stubProvider("codex")}, map[string]time.Duration{"claude": 5 * time.Minute, "codex": time.Minute}, false)
 	t.Cleanup(m.Close)
 	m.color = false
 	m.now = time.Date(2030, 1, 1, 10, 0, 0, 0, time.UTC)
@@ -33,7 +33,7 @@ func testModel(t *testing.T) *Model {
 }
 
 func TestViewsFitSmallAndLargePanes(t *testing.T) {
-	for _, size := range [][2]int{{28, 8}, {40, 12}, {60, 20}, {80, 24}, {120, 30}} {
+	for _, size := range [][2]int{{28, 8}, {28, 12}, {40, 12}, {60, 16}, {60, 20}, {80, 24}, {120, 30}} {
 		m := testModel(t)
 		m.width, m.height = size[0], size[1]
 		view := m.View()
@@ -199,7 +199,7 @@ func TestHeaderShowsEffectiveRefreshIntervals(t *testing.T) {
 			m := testModel(t)
 			m.width = tc.width
 			m.states[0].interval, m.states[1].interval = tc.claude, tc.codex
-			header := strings.Split(ansi.Strip(m.View().Content), "\n")[0]
+			header := ansi.Strip(strings.Join(m.header(), "\n"))
 			if tc.label == "" {
 				if strings.TrimSpace(header) != "metron" {
 					t.Fatalf("narrow header = %q, want title only", header)
@@ -207,8 +207,10 @@ func TestHeaderShowsEffectiveRefreshIntervals(t *testing.T) {
 			} else if !strings.Contains(header, tc.label) {
 				t.Fatalf("header = %q, want %q", header, tc.label)
 			}
-			if ansi.StringWidth(header) > tc.width || strings.Contains(header, "…") {
-				t.Fatalf("header clipped or overflowed: %q", header)
+			for _, line := range strings.Split(header, "\n") {
+				if ansi.StringWidth(line) > m.innerWidth() || strings.Contains(line, "…") {
+					t.Fatalf("header clipped or overflowed: %q", header)
+				}
 			}
 		})
 	}

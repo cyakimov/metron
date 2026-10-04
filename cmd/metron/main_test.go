@@ -78,9 +78,26 @@ func TestHelpDocumentsRefreshIntervals(t *testing.T) {
 	if !errors.Is(err, flag.ErrHelp) {
 		t.Fatalf("error = %v, want help", err)
 	}
-	for _, text := range []string{"refresh-interval", "claude-refresh-interval", "codex-refresh-interval", "Claude every 5 minutes", "Codex every minute", "platform flags take precedence", "positive durations", "r refresh"} {
+	for _, text := range []string{"refresh-interval", "claude-refresh-interval", "codex-refresh-interval", "Claude every 5 minutes", "Codex every minute", "platform flags take precedence", "positive durations", "r refresh", "no-motion", "a toggle motion"} {
 		if !strings.Contains(output.String(), text) {
 			t.Errorf("help missing %q: %s", text, &output)
+		}
+	}
+}
+
+func TestMotionFlag(t *testing.T) {
+	for _, tc := range []struct {
+		args     []string
+		noMotion bool
+	}{
+		{nil, false},
+		{[]string{"--no-motion"}, true},
+		{[]string{"--no-motion=false"}, false},
+	} {
+		var output bytes.Buffer
+		opts, err := parseOptions(tc.args, &output)
+		if err != nil || opts.noMotion != tc.noMotion {
+			t.Fatalf("args %v: noMotion = %t, err = %v", tc.args, opts.noMotion, err)
 		}
 	}
 }
