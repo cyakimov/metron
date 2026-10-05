@@ -144,7 +144,7 @@ func TestMotionToggleStopsAndRestartsWithoutDuplicateTimers(t *testing.T) {
 	}
 }
 
-func TestBarTransitionKeepsAuthoritativeNumbersAndFinishes(t *testing.T) {
+func TestHealthTransitionKeepsAuthoritativeNumbersAndFinishes(t *testing.T) {
 	m := testModel(t)
 	m.motion, m.animationAt = true, m.now
 	m.sceneAt = m.now
@@ -152,24 +152,24 @@ func TestBarTransitionKeepsAuthoritativeNumbersAndFinishes(t *testing.T) {
 	fresh := provider.Snapshot{ObservedAt: at, Windows: []provider.Window{{ID: "5h", Label: "5h", UsedPercent: 82}}}
 	m.Update(resultMsg{index: 0, at: at, snapshot: fresh})
 	w := m.states[0].snapshot.Windows[0]
-	if m.barValue(m.states[0], w) != 38 || !strings.Contains(ansi.Strip(m.View().Content), "82% used") {
-		t.Fatal("transition lost old bar position or displayed an invented percentage")
+	if m.usageValue(m.states[0], w) != 38 || !strings.Contains(ansi.Strip(m.View().Content), "18% left") {
+		t.Fatal("transition lost old health position or displayed an invented percentage")
 	}
 	m.Update(animationMsg(at.Add(frameInterval)))
-	if value := m.barValue(m.states[0], w); value <= 38 || value >= 82 {
-		t.Fatalf("intermediate bar = %f", value)
+	if value := m.usageValue(m.states[0], w); value <= 38 || value >= 82 {
+		t.Fatalf("intermediate usage = %f", value)
 	}
-	m.Update(animationMsg(at.Add(barDuration)))
-	if m.barValue(m.states[0], w) != 82 {
-		t.Fatal("bar did not reach the reported percentage")
+	m.Update(animationMsg(at.Add(healthDuration)))
+	if m.usageValue(m.states[0], w) != 82 {
+		t.Fatal("health did not reach the reported percentage")
 	}
 	m.Update(animationMsg(at.Add(3 * time.Second)))
 	if m.animationDelay() != ambientInterval {
 		t.Fatal("completed transition did not return to ambient animation")
 	}
-	m.states[0].barAt = m.animationAt
+	m.states[0].healthAt = m.animationAt
 	m.states[0].err = errors.New("connection lost")
-	if m.barValue(m.states[0], w) != 82 {
+	if m.usageValue(m.states[0], w) != 82 {
 		t.Fatal("stale values retained an unfinished transition")
 	}
 }
@@ -197,6 +197,8 @@ func TestIdleBlinkAndSuccessExpireWithoutChangingQuota(t *testing.T) {
 	for i := range m.states {
 		m.states[i].fetching = false
 	}
+	m.visit = ambientVisit{}
+	m.nextVisit = m.animationAt.Add(time.Hour)
 	m.successUntil = m.animationAt.Add(750 * time.Millisecond)
 	if mood, _, _ := m.mood(); mood != "success" {
 		t.Fatal("successful update did not produce a reaction")
@@ -245,7 +247,7 @@ func TestQuotaColumnsAlignAcrossProviders(t *testing.T) {
 	m.states[0].snapshot.Windows[0].Label = "Fable 5h"
 	column := -1
 	for _, row := range m.body() {
-		if at := strings.Index(ansi.Strip(row), "% used"); at >= 0 {
+		if at := strings.Index(ansi.Strip(row), "% left"); at >= 0 {
 			if column >= 0 && column != at {
 				t.Fatalf("percentages shifted from column %d to %d: %q", column, at, row)
 			}

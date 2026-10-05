@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"errors"
+	"math/rand/v2"
 	"reflect"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ func sceneModel(t *testing.T) *Model {
 	t.Helper()
 	m := testModel(t)
 	m.motion, m.animationAt, m.sceneAt = true, m.now, m.now
+	m.random = rand.New(rand.NewPCG(1, 2))
 	return m
 }
 
@@ -30,7 +32,7 @@ func TestBackgroundPreservesForegroundAcrossScenesAndScrolling(t *testing.T) {
 				m := sceneModel(t)
 				m.width, m.height, m.dark, m.color = size[0], size[1], theme[0], theme[1]
 				freshUsage(m, 0, m.now, used)
-				for _, elapsed := range []time.Duration{500 * time.Millisecond, 1250 * time.Millisecond, cometPeriod + 750*time.Millisecond} {
+				for _, elapsed := range []time.Duration{500 * time.Millisecond, 1250 * time.Millisecond, 20 * time.Second} {
 					m.animationAt = m.sceneAt.Add(elapsed)
 					assertScenePreservesForeground(t, m)
 					m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
@@ -145,7 +147,7 @@ func TestStaleSnapshotsDoNotDriveStormsOrResetQuota(t *testing.T) {
 		t.Fatal("stale critical values drove the background storm")
 	}
 	m.Update(resultMsg{index: 1, at: at.Add(3 * time.Second), err: errors.New("connection lost")})
-	if m.stormTier != 0 || m.stormActive() || !strings.Contains(ansi.Strip(m.View().Content), "94% used") {
+	if m.stormTier != 0 || m.stormActive() || !strings.Contains(ansi.Strip(m.View().Content), "6% left") {
 		t.Fatal("all-stale data kept warnings active or discarded reported usage")
 	}
 	freshUsage(m, 0, at.Add(4*time.Second), 94)
@@ -181,12 +183,13 @@ func TestAmbientAndTravelAnimationScheduling(t *testing.T) {
 	if m.animationDelay() != ambientInterval {
 		t.Fatal("ordinary twinkles did not use two frames per second")
 	}
-	m.animationAt = m.sceneAt.Add(cometPeriod + cometDuration/2)
-	if !m.cometActive(m.backgroundRegions()) || m.animationDelay() != frameInterval {
+	m.visit = ambientVisit{kind: "comet", at: m.sceneAt, region: travelRegion(m.backgroundRegions())}
+	m.animationAt = m.sceneAt.Add(cometDuration / 2)
+	if !m.visitActive(m.backgroundRegions()) || m.animationDelay() != frameInterval {
 		t.Fatal("comet did not use eight frames per second")
 	}
-	m.animationAt = m.sceneAt.Add(cometPeriod + cometDuration)
-	if m.cometActive(m.backgroundRegions()) || m.animationDelay() != ambientInterval {
+	m.animationAt = m.sceneAt.Add(cometDuration)
+	if m.visitActive(m.backgroundRegions()) || m.animationDelay() != ambientInterval {
 		t.Fatal("comet did not end and return to ambient cadence")
 	}
 	if m.animate() == nil || m.animate() != nil {
@@ -210,9 +213,10 @@ func TestAmbientAndTravelAnimationScheduling(t *testing.T) {
 func TestCometsAndStormsRenderMovingEffects(t *testing.T) {
 	m := sceneModel(t)
 	regions := m.backgroundRegions()
-	m.animationAt = m.sceneAt.Add(cometPeriod + cometDuration/3)
+	m.visit = ambientVisit{kind: "comet", at: m.sceneAt, region: travelRegion(regions)}
+	m.animationAt = m.sceneAt.Add(cometDuration / 3)
 	first := meteorHead(m.scenePoints(regions), "starBright")
-	m.animationAt = m.sceneAt.Add(cometPeriod + 2*cometDuration/3)
+	m.animationAt = m.sceneAt.Add(2 * cometDuration / 3)
 	second := meteorHead(m.scenePoints(regions), "starBright")
 	if first.x < 0 || second.x <= first.x {
 		t.Fatal("comet did not cross open background space")

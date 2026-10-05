@@ -16,6 +16,7 @@ var darkPalette = map[string]string{
 	"title": "#83DDF4", "accent": "#BC9CFF", "border": "#52617C",
 	"track": "#344159", "muted": "#96A3B8", "claude": "#F2B38D",
 	"codex": "#83DDF4", "good": "#8CDBC0", "warn": "#FFD089", "bad": "#FF8E9B",
+	"heart": "#F27691", "heartFlash": "#FFE1E8",
 	"starDim": "#3E516E", "star": "#6E93B6", "starBright": "#9FC6E0",
 }
 
@@ -23,6 +24,7 @@ var lightPalette = map[string]string{
 	"title": "#00708D", "accent": "#6E48B6", "border": "#8C9AB0",
 	"track": "#CDD5DE", "muted": "#566477", "claude": "#A8512A",
 	"codex": "#00708D", "good": "#14724F", "warn": "#956000", "bad": "#AA2644",
+	"heart": "#B82E53", "heartFlash": "#D34351",
 	"starDim": "#A2ADBF", "star": "#6884A2", "starBright": "#356C8D",
 }
 
@@ -142,22 +144,10 @@ func (m *Model) foregroundRows() []string {
 }
 
 func (m *Model) body() []string {
+	layout := m.meterLayout()
 	width := m.innerWidth()
 	framed := m.expanded()
-	contentWidth := width
-	if framed {
-		contentWidth -= 4
-	}
-	labelWidth, resetWidth := 2, 0
-	for _, s := range m.states {
-		if s.snapshot != nil {
-			for _, w := range s.snapshot.Windows {
-				labelWidth = max(labelWidth, ansi.StringWidth(w.Label))
-				resetWidth = max(resetWidth, ansi.StringWidth(m.resetText(w)))
-			}
-		}
-	}
-	labelWidth = min(labelWidth, min(18, max(8, contentWidth/3)))
+	contentWidth := layout.width
 	var lines []string
 	for i, s := range m.states {
 		if i > 0 {
@@ -178,7 +168,7 @@ func (m *Model) body() []string {
 		var content []string
 		if s.snapshot != nil {
 			for _, w := range s.snapshot.Windows {
-				content = append(content, m.window(w, contentWidth, labelWidth, resetWidth, m.barValue(s, w))...)
+				content = append(content, m.window(s, w, layout)...)
 			}
 			for _, detail := range s.snapshot.Details {
 				content = append(content, m.wrapped(detail, "muted", contentWidth)...)
@@ -245,42 +235,6 @@ func (m *Model) resetText(w provider.Window) string {
 		return "reset pending"
 	}
 	return "resets in " + countdown(w.ResetsAt.Sub(m.now))
-}
-
-func (m *Model) window(w provider.Window, width, labelWidth, resetWidth int, barUsed float64) []string {
-	kind := "good"
-	if w.UsedPercent >= 90 {
-		kind = "bad"
-	} else if w.UsedPercent >= 70 {
-		kind = "warn"
-	}
-	label := ansi.Truncate(w.Label, labelWidth, "…")
-	label += strings.Repeat(" ", max(0, labelWidth-ansi.StringWidth(label)))
-	pct := fmt.Sprintf("%3.0f%% used", w.UsedPercent)
-	reset := m.resetText(w)
-	available := width - 2
-	barWidth := min(24, available-labelWidth-ansi.StringWidth(pct)-resetWidth-6)
-	if barWidth >= 8 {
-		return []string{"  " + label + "  " + m.bar(barWidth, barUsed, kind) + "  " + m.style(pct, kind) + "  " + m.style(reset, "muted")}
-	}
-	barWidth = min(16, available-labelWidth-ansi.StringWidth(pct)-4)
-	line := "  " + label + "  "
-	if barWidth >= 4 {
-		line += m.bar(barWidth, barUsed, kind) + "  "
-	}
-	line += m.style(pct, kind)
-	return []string{line, "    " + m.style(reset, "muted")}
-}
-
-func (m *Model) bar(width int, used float64, kind string) string {
-	units := int(math.Round(float64(width*8) * min(100, max(0, used)) / 100))
-	filled := units / 8
-	bar := strings.Repeat("█", filled)
-	if part := units % 8; part > 0 {
-		bar += []string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}[part]
-		filled++
-	}
-	return m.style(bar, kind) + m.style(strings.Repeat("░", width-filled), "track")
 }
 
 func countdown(d time.Duration) string {

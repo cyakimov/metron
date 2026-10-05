@@ -10,7 +10,7 @@ import (
 )
 
 const frameInterval = time.Second / 8
-const barDuration = 350 * time.Millisecond
+const healthDuration = 350 * time.Millisecond
 
 type animationMsg time.Time
 
@@ -39,10 +39,13 @@ func (m *Model) animationDelay() time.Duration {
 	}
 	active := m.expanded() && (m.animationAt.Before(m.blinkUntil) || m.animationAt.Before(m.successUntil))
 	for _, s := range m.states {
-		active = active || (s.fetching && s.err == nil) || (len(s.barFrom) > 0 && s.err == nil && m.animationAt.Sub(s.barAt) < barDuration)
+		active = active || (s.fetching && s.err == nil) || (len(s.healthFrom) > 0 && s.err == nil && m.animationAt.Sub(s.healthAt) < healthDuration)
+		for _, r := range s.reactions {
+			active = active || m.reactionActive(s, r)
+		}
 	}
 	regions := m.backgroundRegions()
-	if active || (m.expanded() && m.stormActive()) || m.cometActive(regions) {
+	if active || (m.expanded() && m.stormActive()) || m.visitActive(regions) {
 		return frameInterval
 	}
 	if len(backgroundStars(regions)) > 0 {
@@ -65,12 +68,12 @@ func (m *Model) spinner() string {
 	return []string{"◐", "◓", "◑", "◒"}[m.frame()]
 }
 
-func (m *Model) barValue(s state, w provider.Window) float64 {
-	from, ok := s.barFrom[w.ID]
+func (m *Model) usageValue(s state, w provider.Window) float64 {
+	from, ok := s.healthFrom[w.ID]
 	if !ok || !m.motion || s.err != nil {
 		return w.UsedPercent
 	}
-	t := min(1, max(0, float64(m.animationAt.Sub(s.barAt))/float64(barDuration)))
+	t := min(1, max(0, float64(m.animationAt.Sub(s.healthAt))/float64(healthDuration)))
 	return from + (w.UsedPercent-from)*(1-math.Pow(1-t, 3))
 }
 

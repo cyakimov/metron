@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"os"
 	"time"
 
@@ -12,14 +13,15 @@ import (
 )
 
 type state struct {
-	provider provider.Provider
-	interval time.Duration
-	snapshot *provider.Snapshot
-	err      error
-	fetching bool
-	nextPoll time.Time
-	barFrom  map[string]float64
-	barAt    time.Time
+	provider   provider.Provider
+	interval   time.Duration
+	snapshot   *provider.Snapshot
+	err        error
+	fetching   bool
+	nextPoll   time.Time
+	healthFrom map[string]float64
+	healthAt   time.Time
+	reactions  map[string]reaction
 }
 
 type Model struct {
@@ -37,6 +39,9 @@ type Model struct {
 	sceneAt               time.Time
 	stormTier             int
 	stormAt, nextStorm    time.Time
+	random                *rand.Rand
+	nextVisit             time.Time
+	visit                 ambientVisit
 }
 
 type tickMsg time.Time
@@ -50,7 +55,13 @@ type resultMsg struct {
 func New(providers []provider.Provider, intervals map[string]time.Duration, motionEnabled bool) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	now := time.Now()
-	m := &Model{ctx: ctx, cancel: cancel, now: now, width: 80, height: 24, dark: true, color: os.Getenv("NO_COLOR") == "", motion: motionEnabled, animationAt: now, nextBlink: now.Add(6 * time.Second), sceneAt: now}
+	m := &Model{
+		ctx: ctx, cancel: cancel, now: now,
+		width: 80, height: 24, dark: true,
+		color: os.Getenv("NO_COLOR") == "", motion: motionEnabled,
+		animationAt: now, nextBlink: now.Add(6 * time.Second), sceneAt: now,
+		random: rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())),
+	}
 	for _, p := range providers {
 		m.states = append(m.states, state{provider: p, interval: intervals[p.ID()]})
 	}
@@ -64,6 +75,7 @@ func (m *Model) Init() tea.Cmd {
 	for i := range m.states {
 		commands = append(commands, m.poll(i))
 	}
+	m.updateAmbient()
 	commands = append(commands, m.animate())
 	return tea.Batch(commands...)
 }
@@ -101,21 +113,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.advanceAnimation(msg.at)
 		s := &m.states[msg.index]
 		s.fetching = false
-		s.err = msg.err
 		s.nextPoll = msg.at.Add(s.interval)
 		if msg.err == nil {
-			from := make(map[string]float64)
-			if s.snapshot != nil {
-				for _, old := range s.snapshot.Windows {
-					for _, fresh := range msg.snapshot.Windows {
-						if old.ID == fresh.ID && old.UsedPercent != fresh.UsedPercent {
-							from[old.ID] = m.barValue(*s, old)
-						}
-					}
-				}
-			}
-			s.barFrom, s.barAt = from, msg.at
-			s.snapshot = &msg.snapshot
+			m.acceptSnapshot(s, msg.snapshot)
 			m.successUntil = msg.at.Add(750 * time.Millisecond)
 		} else {
 			var problem *provider.Problem
@@ -123,6 +123,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.nextPoll = problem.RetryAt
 			}
 		}
+		s.err = msg.err
 		m.updateStorm()
 		m.clampOffset()
 	case tickMsg:
@@ -133,6 +134,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.nextBlink = m.now.Add(6 * time.Second)
 		}
 		m.updateStorm()
+		m.updateAmbient()
 		commands := []tea.Cmd{tick()}
 		for i := range m.states {
 			if !m.states[i].fetching && !m.now.Before(m.states[i].nextPoll) {
@@ -145,6 +147,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animationPending = false
 		m.advanceAnimation(time.Time(msg))
 		m.updateStorm()
+		m.updateAmbient()
 		return m, m.animate()
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -153,7 +156,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "r":
 			m.now = time.Now()
-			m.animationAt = m.now
+			m.advanceAnimation(m.now)
 			var commands []tea.Cmd
 			for i := range m.states {
 				var problem *provider.Problem
@@ -166,14 +169,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(commands...)
 		case "a":
 			m.motion = !m.motion
-			m.animationAt = time.Now()
+			m.advanceAnimation(time.Now())
 			m.blinkUntil, m.successUntil = time.Time{}, time.Time{}
 			m.nextBlink = m.animationAt.Add(6 * time.Second)
 			m.sceneAt = m.animationAt
+			m.visit, m.nextVisit = ambientVisit{}, time.Time{}
 			m.stormTier, m.stormAt, m.nextStorm = 0, time.Time{}, time.Time{}
 			m.updateStorm()
 			for i := range m.states {
-				m.states[i].barFrom = nil
+				m.states[i].healthFrom = nil
+				m.states[i].reactions = nil
 			}
 		case "down", "j":
 			m.offset++
@@ -190,6 +195,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clampOffset()
 	}
+	m.updateAmbient()
 	return m, m.animate()
 }
 

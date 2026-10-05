@@ -44,9 +44,18 @@ Run `metron --no-motion` to start with animations paused.
 
 The cosmic observer scans during refreshes, acknowledges successful updates, and reacts to quota pressure or unavailable providers.
 Larger panes show the observer beside the title and frame each provider's limits.
+Each limit has eight red heart containers representing quota remaining.
+All pane sizes use small filled (♥) and outline (♡) heart symbols with whole-heart steps.
+A final filled heart remains until quota is exhausted, and the percentage beside it shows quota left.
+Over-limit usage keeps the reported percentage used visible alongside zero remaining health.
+A fresh increase in usage briefly flashes damage; confirmed recovery produces a healing sparkle.
+First observations, unchanged values, and reset countdowns never invent damage or healing.
 Smaller panes use a compact layout with the same data and controls.
-Animations never change reported percentages or provider refresh intervals.
-Open background space contains slowly twinkling stars and occasional comets.
+Animations never change reported quota or provider refresh intervals.
+Open background space contains slowly twinkling stars, visiting scouts and UFOs, and occasional comets.
+After 12-25 seconds of quiet, one ship or comet crosses the available space in either direction.
+Ships take six seconds to pass, while comets cross in one and a half seconds.
+Account panels and controls stay protected, and quota warning effects take priority over ambient visits.
 At 70% used, a brief amber ripple accompanies the affected provider's pulsing border; at 90%, a red meteor burst takes over.
 The highest available usage tier sets the cadence for these two-second reminders: every 30 seconds at 70% or every 20 seconds at 90%.
 Paused motion leaves a static starfield, and small panes prioritize account data over travelling effects.
@@ -83,7 +92,8 @@ Credit balances and extra usage appear when the provider supplies them.
 A missing five-hour window stays missing; Metron never estimates a quota from local token logs.
 Passing a reset time shows `reset pending` until a fresh provider response confirms the new usage.
 
-Bars turn yellow at 70% used and red at 90% used.
+Remaining-quota labels turn yellow at 30% left and red at 10% left.
+Filled hearts stay red; empty containers have dim outlines that also remain distinct without color.
 After a failed request, the previous values remain visibly **stale**, with their age and a short error.
 Manual refresh respects provider retry delays.
 Automatic refresh also honors any provider retry deadline later than the configured interval.

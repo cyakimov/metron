@@ -11,8 +11,6 @@ import (
 
 const ambientInterval = time.Second / 2
 const stormDuration = 2 * time.Second
-const cometPeriod = 12 * time.Second
-const cometDuration = 1500 * time.Millisecond
 
 type point struct{ x, y int }
 type region struct{ x, y, width, height int }
@@ -91,11 +89,6 @@ func travelRegion(regions []region) region {
 	return best
 }
 
-func (m *Model) cometActive(regions []region) bool {
-	elapsed := m.sceneElapsed()
-	return m.motion && m.expanded() && elapsed >= cometPeriod && elapsed%cometPeriod < cometDuration && travelRegion(regions).width > 0
-}
-
 func providerTier(s state) int {
 	if s.snapshot == nil || s.err != nil {
 		return 0
@@ -161,7 +154,7 @@ func (m *Model) borderKind(s state) string {
 	return "border"
 }
 
-func paintMeteor(points map[point]sparkle, r region, progress float64, seed uint64, kind string) {
+func paintMeteor(points map[point]sparkle, r region, progress float64, seed uint64, kind string, reverse bool) {
 	if progress < 0 || progress >= 1 || r.width == 0 {
 		return
 	}
@@ -171,6 +164,9 @@ func paintMeteor(points map[point]sparkle, r region, progress float64, seed uint
 		p := point{x - i, y}
 		if i > 1 {
 			p.y--
+		}
+		if reverse {
+			p.x = r.x + r.width - 1 - (p.x - r.x)
 		}
 		if r.contains(p) {
 			points[p] = sparkle{glyph, kind}
@@ -196,8 +192,12 @@ func (m *Model) scenePoints(regions []region) map[point]sparkle {
 		points[s.point] = sparkle{glyph, kind}
 	}
 	r := travelRegion(regions)
-	if m.cometActive(regions) {
-		paintMeteor(points, r, float64(elapsed%cometPeriod)/float64(cometDuration), uint64(elapsed/cometPeriod), "starBright")
+	if m.visitActive(regions) {
+		if m.visit.kind == "comet" {
+			paintMeteor(points, m.visit.region, float64(m.animationAt.Sub(m.visit.at))/float64(cometDuration), m.visit.seed, "starBright", m.visit.reverse)
+		} else {
+			m.paintShip(points)
+		}
 	}
 	if !m.expanded() || !m.stormActive() || r.width == 0 {
 		return points
@@ -205,7 +205,7 @@ func (m *Model) scenePoints(regions []region) map[point]sparkle {
 	progress := float64(m.animationAt.Sub(m.stormAt)) / float64(stormDuration)
 	if m.stormTier == 2 {
 		for i := range 3 {
-			paintMeteor(points, r, (progress-float64(i)*0.15)/0.65, uint64(i+1), "bad")
+			paintMeteor(points, r, (progress-float64(i)*0.15)/0.65, uint64(i+1), "bad", false)
 		}
 		return points
 	}

@@ -64,7 +64,7 @@ func TestStaleStateSurvivesFailureAndRefresh(t *testing.T) {
 	}
 	m.states[0].fetching = true
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "stale") || !strings.Contains(view, "38% used") || !strings.Contains(view, "live") {
+	if !strings.Contains(view, "stale") || !strings.Contains(view, "62% left") || !strings.Contains(view, "live") {
 		t.Fatal(view)
 	}
 	m.Update(resultMsg{index: 0, at: m.now, snapshot: provider.Snapshot{ObservedAt: m.now, Windows: []provider.Window{{ID: "5h", Label: "5h", UsedPercent: 42}}}})
@@ -77,7 +77,7 @@ func TestResetDoesNotInventFreshQuota(t *testing.T) {
 	m := testModel(t)
 	m.now = m.now.Add(3 * time.Hour)
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "reset pending") || !strings.Contains(view, "38% used") || !strings.Contains(view, "reset time unavailable") {
+	if !strings.Contains(view, "reset pending") || !strings.Contains(view, "62% left") || !strings.Contains(view, "reset time unavailable") {
 		t.Fatal(view)
 	}
 }
