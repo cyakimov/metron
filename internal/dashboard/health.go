@@ -88,11 +88,11 @@ func (m *Model) hearts(s state, w provider.Window) string {
 			}
 			hearts.WriteString(gap)
 		}
-		glyph, color := "♡", "track"
+		color := "heartEmpty"
 		if i < units {
-			glyph, color = "♥", kind
+			color = kind
 		}
-		hearts.WriteString(m.style(glyph, color))
+		hearts.WriteString(m.style("♥", color))
 	}
 	return hearts.String()
 }

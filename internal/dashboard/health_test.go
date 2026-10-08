@@ -30,11 +30,14 @@ func TestHealthStagesAndRemainingLabels(t *testing.T) {
 	} {
 		m := testModel(t)
 		w := provider.Window{ID: "5h", Label: "5h", UsedPercent: tc.used}
-		for _, theme := range [][2]bool{{true, true}, {false, true}, {true, false}} {
+		for _, theme := range [][2]bool{{true, true}, {false, true}, {true, false}, {false, false}} {
 			m.dark, m.color = theme[0], theme[1]
 			hearts := m.hearts(state{}, w)
-			if strings.Count(hearts, "♥") != tc.full || strings.Count(hearts, "♡") != 8-tc.full {
-				t.Fatalf("%.3f%% used: incorrect heart stages: %q", tc.used, hearts)
+			if ansi.Strip(hearts) != "♥ ♥ ♥ ♥ ♥ ♥ ♥ ♥" {
+				t.Fatalf("%.3f%% used: heart glyphs changed: %q", tc.used, hearts)
+			}
+			if m.color && (strings.Count(hearts, m.style("♥", "heart")) != tc.full || strings.Count(hearts, m.style("♥", "heartEmpty")) != 8-tc.full) {
+				t.Fatalf("%.3f%% used: incorrect heart colors: %q", tc.used, hearts)
 			}
 			if ansi.StringWidth(hearts) != 15 || strings.Contains(hearts, "\n") || (!m.color && hasColor(hearts)) {
 				t.Fatalf("heart meter changed geometry or monochrome rendering: %q", hearts)
@@ -54,7 +57,7 @@ func TestHeartLayoutAdaptsToWidthHeightAndWindowCount(t *testing.T) {
 		if !strings.Contains(body, "62% left") || strings.ContainsAny(body, "█▄▀") {
 			t.Fatalf("%v: missing remaining quota or oversized hearts", size)
 		}
-		if size[0] >= 40 && strings.Count(body, "♥")+strings.Count(body, "♡") != 32 {
+		if size[0] >= 40 && strings.Count(body, "♥") != 32 {
 			t.Fatalf("%v: missing heart containers", size)
 		}
 		for _, line := range m.body() {
@@ -73,7 +76,7 @@ func TestHeartLayoutAdaptsToWidthHeightAndWindowCount(t *testing.T) {
 	for i := range 8 {
 		m.states[0].snapshot.Windows = append(m.states[0].snapshot.Windows, provider.Window{ID: string(rune('a' + i)), Label: "Model-specific 7d", UsedPercent: 50})
 	}
-	if strings.Count(strings.Join(m.body(), "\n"), "♥")+strings.Count(strings.Join(m.body(), "\n"), "♡") != 96 {
+	if strings.Count(strings.Join(m.body(), "\n"), "♥") != 96 {
 		t.Fatal("many windows lost heart containers")
 	}
 	for _, line := range m.body() {
@@ -114,9 +117,15 @@ func TestPerWindowDamageHealingAndExpiry(t *testing.T) {
 		t.Fatal("reactions did not match individual window changes")
 	}
 	for i, marker := range []string{"!", "✧"} {
-		hearts := m.hearts(s, fresh.Windows[i])
-		if !strings.Contains(hearts, marker) || ansi.StringWidth(hearts) != 15 {
-			t.Fatalf("monochrome reaction missing %q or changed meter width: %q", marker, hearts)
+		for _, theme := range [][2]bool{{true, true}, {false, true}, {true, false}} {
+			m.dark, m.color = theme[0], theme[1]
+			hearts := m.hearts(s, fresh.Windows[i])
+			if !strings.Contains(hearts, marker) || ansi.StringWidth(hearts) != 15 || strings.Count(hearts, "♥") != 8 {
+				t.Fatalf("reaction missing %q or changed meter geometry: %q", marker, hearts)
+			}
+			if m.color && strings.Count(hearts, m.style("♥", "heartEmpty")) != []int{3, 4}[i] {
+				t.Fatalf("reaction changed consumed heart colors: %q", hearts)
+			}
 		}
 	}
 	m.Update(animationMsg(at.Add(damageDuration)))

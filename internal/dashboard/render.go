@@ -16,7 +16,7 @@ var darkPalette = map[string]string{
 	"title": "#83DDF4", "accent": "#BC9CFF", "border": "#52617C",
 	"track": "#344159", "muted": "#96A3B8", "claude": "#F2B38D",
 	"codex": "#83DDF4", "good": "#8CDBC0", "warn": "#FFD089", "bad": "#FF8E9B",
-	"heart": "#F27691", "heartFlash": "#FFE1E8",
+	"heart": "#F27691", "heartFlash": "#FFE1E8", "heartEmpty": "#A0A0A0",
 	"starDim": "#3E516E", "star": "#6E93B6", "starBright": "#9FC6E0",
 }
 
@@ -24,7 +24,7 @@ var lightPalette = map[string]string{
 	"title": "#00708D", "accent": "#6E48B6", "border": "#8C9AB0",
 	"track": "#CDD5DE", "muted": "#566477", "claude": "#A8512A",
 	"codex": "#00708D", "good": "#14724F", "warn": "#956000", "bad": "#AA2644",
-	"heart": "#B82E53", "heartFlash": "#D34351",
+	"heart": "#B82E53", "heartFlash": "#D34351", "heartEmpty": "#737373",
 	"starDim": "#A2ADBF", "star": "#6884A2", "starBright": "#356C8D",
 }
 

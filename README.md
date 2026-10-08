@@ -44,9 +44,9 @@ Run `metron --no-motion` to start with animations paused.
 
 The cosmic observer scans during refreshes, acknowledges successful updates, and reacts to quota pressure or unavailable providers.
 Larger panes show the observer beside the title and frame each provider's limits.
-Each limit has eight red heart containers representing quota remaining.
-All pane sizes use small filled (♥) and outline (♡) heart symbols with whole-heart steps.
-A final filled heart remains until quota is exhausted, and the percentage beside it shows quota left.
+Each limit has eight heart containers representing quota remaining.
+All pane sizes use the same small heart symbol (♥) with whole-heart steps.
+A final red heart remains until quota is exhausted, and the percentage beside it shows quota left.
 Over-limit usage keeps the reported percentage used visible alongside zero remaining health.
 A fresh increase in usage briefly flashes damage; confirmed recovery produces a healing sparkle.
 First observations, unchanged values, and reset countdowns never invent damage or healing.
@@ -93,7 +93,8 @@ A missing five-hour window stays missing; Metron never estimates a quota from lo
 Passing a reset time shows `reset pending` until a fresh provider response confirms the new usage.
 
 Remaining-quota labels turn yellow at 30% left and red at 10% left.
-Filled hearts stay red; empty containers have dim outlines that also remain distinct without color.
+Remaining hearts stay red; consumed hearts use the same glyph in gray.
+With color disabled, all hearts look identical and the percentage shows quota left.
 After a failed request, the previous values remain visibly **stale**, with their age and a short error.
 Manual refresh respects provider retry delays.
 Automatic refresh also honors any provider retry deadline later than the configured interval.
