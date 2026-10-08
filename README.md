@@ -117,8 +117,9 @@ Tests cover response compatibility, authentication errors, retry delays, app-ser
 ## Release
 
 Tag a verified commit as `vX.Y.Z` and push the tag.
-Update `Formula/metron.rb` in [cyakimov/homebrew-tap](https://github.com/cyakimov/homebrew-tap) with the tagged source URL and its SHA-256 checksum.
-The formula builds the binary from source with Go.
+The `homebrew` workflow opens a `bump-metron-X.Y.Z` pull request on [cyakimov/homebrew-tap](https://github.com/cyakimov/homebrew-tap).
+The tap's CI builds macOS bottles, publishes them, and merges the bump, so `brew install` pours a prebuilt binary.
+If the bump fails, fix the cause and rerun it with `gh workflow run homebrew.yml -R cyakimov/metron -f tag=vX.Y.Z`.
 
 ## License
 
