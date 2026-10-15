@@ -89,6 +89,7 @@ Provider reporting may introduce additional delay.
 
 Every reported limit window is shown, including model-specific windows and spend limits.
 Credit balances and extra usage appear when the provider supplies them.
+Codex credit balances and spend amounts are rounded to whole credits with thousands separators for display; quota percentages still use the provider's reported values.
 A missing five-hour window stays missing; Metron never estimates a quota from local token logs.
 Passing a reset time shows `reset pending` until a fresh provider response confirms the new usage.
 

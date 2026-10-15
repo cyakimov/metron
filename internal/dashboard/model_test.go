@@ -55,6 +55,26 @@ func TestViewsFitSmallAndLargePanes(t *testing.T) {
 	}
 }
 
+func TestWholeCreditDetailsRemainReadableAcrossPaneSizes(t *testing.T) {
+	for _, size := range [][2]int{{28, 12}, {40, 12}, {60, 16}, {80, 24}, {120, 30}} {
+		m := testModel(t)
+		m.width, m.height = size[0], size[1]
+		m.states = m.states[1:]
+		m.states[0].snapshot.Windows = nil
+		m.states[0].snapshot.Details = []string{"Credits  37,296 left", "Spend  204 used of 37,500"}
+		view := ansi.Strip(m.View().Content)
+		for _, line := range strings.Split(view, "\n") {
+			if ansi.StringWidth(line) > size[0] {
+				t.Fatalf("%v: overflow %q", size, line)
+			}
+		}
+		text := strings.Join(strings.Fields(strings.ReplaceAll(view, "│", "")), " ")
+		if !strings.Contains(text, "Credits 37,296 left") || !strings.Contains(text, "Spend 204 used of 37,500") || !strings.Contains(text, "q quit") {
+			t.Fatalf("%v: credit details or controls lost: %s", size, view)
+		}
+	}
+}
+
 func TestStaleStateSurvivesFailureAndRefresh(t *testing.T) {
 	m := testModel(t)
 	before := m.states[0].snapshot

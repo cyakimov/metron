@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"sync"
@@ -160,7 +161,7 @@ func parseCodex(raw []byte) (Snapshot, error) {
 			case limit.Credits.Unlimited:
 				addDetail("Credits unlimited")
 			case limit.Credits.Balance != nil:
-				addDetail("Credits  " + *limit.Credits.Balance + " left")
+				addDetail("Credits  " + formatCodexCredits(*limit.Credits.Balance) + " left")
 			case limit.Credits.HasCredits:
 				addDetail("Credits available")
 			default:
@@ -174,7 +175,7 @@ func parseCodex(raw []byte) (Snapshot, error) {
 				label = scope + " spend"
 			}
 			snapshot.Windows = append(snapshot.Windows, Window{ID: key + ":spend", Label: label, UsedPercent: 100 - limit.Spend.Remaining, ResetsAt: &t})
-			addDetail("Spend  " + limit.Spend.Used + " used of " + limit.Spend.Limit)
+			addDetail("Spend  " + formatCodexCredits(limit.Spend.Used) + " used of " + formatCodexCredits(limit.Spend.Limit))
 		}
 		if limit.SpendReached {
 			snapshot.Notices = append(snapshot.Notices, "Spend limit reached")
@@ -191,4 +192,45 @@ func parseCodex(raw []byte) (Snapshot, error) {
 		addDetail(fmt.Sprintf("Free resets  %d available", response.Resets.Count))
 	}
 	return normalize(snapshot), nil
+}
+
+func formatCodexCredits(value string) string {
+	magnitude := value
+	negative := strings.HasPrefix(magnitude, "-")
+	if negative || strings.HasPrefix(magnitude, "+") {
+		magnitude = magnitude[1:]
+	}
+	whole, fraction, _ := strings.Cut(magnitude, ".")
+	if whole == "" && fraction == "" {
+		return value
+	}
+	for _, part := range []string{whole, fraction} {
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return value
+			}
+		}
+	}
+	if whole == "" {
+		whole = "0"
+	}
+	amount, ok := new(big.Int).SetString(whole, 10)
+	if !ok {
+		return value
+	}
+	if fraction != "" && fraction[0] >= '5' {
+		amount.Add(amount, big.NewInt(1))
+	}
+	digits := amount.String()
+	var result strings.Builder
+	if negative && amount.Sign() != 0 {
+		result.WriteByte('-')
+	}
+	for i := range len(digits) {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			result.WriteByte(',')
+		}
+		result.WriteByte(digits[i])
+	}
+	return result.String()
 }

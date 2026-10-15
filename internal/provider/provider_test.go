@@ -116,6 +116,70 @@ func TestCodexFallbackUnlimitedAndMissingReset(t *testing.T) {
 	}
 }
 
+func TestCodexCreditFormatting(t *testing.T) {
+	for _, tc := range []struct {
+		value, want string
+	}{
+		{"203.5810921", "204"},
+		{"37500", "37,500"},
+		{"37296.4189079", "37,296"},
+		{"0", "0"},
+		{"0.4999999999999999999", "0"},
+		{"0.5", "1"},
+		{"999.4999999999999999999", "999"},
+		{"999.5", "1,000"},
+		{"999999.5", "1,000,000"},
+		{"9007199254740993.5", "9,007,199,254,740,994"},
+		{"-203.5", "-204"},
+		{"-0.5", "-1"},
+		{"-0.49", "0"},
+		{"-0", "0"},
+		{"+0015.00", "15"},
+		{".5", "1"},
+		{"15.", "15"},
+		{"", ""},
+		{".", "."},
+		{"-", "-"},
+		{"unknown", "unknown"},
+		{"NaN", "NaN"},
+		{"Infinity", "Infinity"},
+		{"1.2.3", "1.2.3"},
+		{"1/2", "1/2"},
+		{"1,000", "1,000"},
+		{"12\x1b[31m", "12\x1b[31m"},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			if got := formatCodexCredits(tc.value); got != tc.want {
+				t.Fatalf("formatCodexCredits(%q) = %q, want %q", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCodexRoundedCreditsPreserveReportedQuota(t *testing.T) {
+	s, err := parseCodex([]byte(`{"rateLimits":{"limitId":"codex","credits":{"balance":"37296.4189079","hasCredits":true},"individualLimit":{"used":"203.5810921","limit":"37500.49","remainingPercent":99.45711708773333,"resetsAt":1893758400},"spendControlReached":true},"ordinaryUsageAllowed":false}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(s.Details, []string{"Credits  37,296 left", "Spend  204 used of 37,500"}) {
+		t.Fatal(s.Details)
+	}
+	remaining := 99.45711708773333
+	if len(s.Windows) != 1 || s.Windows[0].UsedPercent != 100-remaining || s.Windows[0].ResetsAt == nil || s.Windows[0].ResetsAt.Unix() != 1893758400 {
+		t.Fatal(s.Windows)
+	}
+	if !slices.Equal(s.Notices, []string{"Spend limit reached", "Included usage unavailable"}) {
+		t.Fatal(s.Notices)
+	}
+}
+
+func TestCodexUnrecognizedAmountsRemainSanitized(t *testing.T) {
+	s, err := parseCodex([]byte(`{"rateLimits":{"credits":{"balance":"unknown\u001b[31m","hasCredits":true},"individualLimit":{"used":"pending","limit":"unknown","remainingPercent":75,"resetsAt":1893758400}}}`))
+	if err != nil || !slices.Equal(s.Details, []string{"Credits  unknown[31m left", "Spend  pending used of unknown"}) {
+		t.Fatal(s, err)
+	}
+}
+
 func TestMalformedResponses(t *testing.T) {
 	for _, raw := range []string{`{`, `null`, `{}`, `[]`} {
 		if _, err := parseClaude([]byte(raw)); err == nil {
