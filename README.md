@@ -112,6 +112,21 @@ Codex inherits `CODEX_HOME` and the installed CLI's normal configuration.
 These provider interfaces are not stable public usage APIs and may require compatibility updates.
 Metron is an independent project with no affiliation to Anthropic, OpenAI, or DC.
 
+## Native macOS app
+
+The native macOS app provides menu bar monitoring for Claude and Codex, optional quota alerts, and WidgetKit extensions.
+Build and launch it with:
+
+```sh
+bash macos/build.sh
+open dist/macos/Metron.app
+```
+
+The app release workflow builds a universal DMG in CI and opens a separate `metron-app` cask pull request in the existing tap.
+After the first app release and cask merge, install it with `brew install --cask cyakimov/tap/metron-app`.
+App builds are ad-hoc signed and not notarized; macOS may require first-launch approval in System Settings > Privacy & Security.
+See [macOS build notes](macos/README.md) for installation, validation, and release details.
+
 ## Development
 
 Requires macOS and Go 1.26 or later.
@@ -132,6 +147,8 @@ Tag a verified commit as `vX.Y.Z` and push the tag.
 The `homebrew` workflow opens a `bump-metron-X.Y.Z` pull request on [cyakimov/homebrew-tap](https://github.com/cyakimov/homebrew-tap).
 The tap's CI builds macOS bottles, publishes them, and merges the bump, so `brew install` pours a prebuilt binary.
 If the bump fails, fix the cause and rerun it with `gh workflow run homebrew.yml -R cyakimov/metron -f tag=vX.Y.Z`.
+The same tag runs the `macOS app release` workflow, publishing the universal app DMG and opening a `cask-metron-app-X.Y.Z` pull request in the tap.
+The CLI formula and app cask can be installed independently.
 
 ## License
 
