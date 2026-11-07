@@ -38,6 +38,7 @@ open dist/macos/Metron.app
 ```
 
 The default build targets the current Mac's architecture and signs ad hoc.
+The app icon is rendered from `macos/Assets/AppIcon.swift` into a complete macOS icon set and bundled as `AppIcon.icns`.
 Use `ARCHS="arm64 x86_64" VERSION=0.1.3 bash macos/build.sh` for a universal build with matching app and extension versions.
 Set `SIGNING_IDENTITY` to a configured signing identity to override ad-hoc signing.
 

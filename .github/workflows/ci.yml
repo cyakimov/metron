@@ -43,4 +43,7 @@ jobs:
             xcrun lipo "$app/Contents/MacOS/metron-helper" -verify_arch "$arch"
             xcrun lipo "$app/Contents/PlugIns/MetronWidget.appex/Contents/MacOS/MetronWidget" -verify_arch "$arch"
           done
+          icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")
+          xcrun iconutil -c iconset "$app/Contents/Resources/$icon" -o "$RUNNER_TEMP/Metron.iconset"
+          test -s "$RUNNER_TEMP/Metron.iconset/icon_512x512@2x.png"
           codesign --verify --deep --strict "$app"

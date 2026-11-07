@@ -35,6 +35,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$WIDGET/Contents/MacOS
 xcrun lipo -create "${helper_inputs[@]}" -output "$APP/Contents/MacOS/metron-helper"
 xcrun lipo -create "${app_inputs[@]}" -output "$APP/Contents/MacOS/Metron"
 xcrun lipo -create "${widget_inputs[@]}" -output "$WIDGET/Contents/MacOS/MetronWidget"
+xcrun swift macos/Assets/AppIcon.swift "$stage/AppIcon.iconset"
+xcrun iconutil -c icns "$stage/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
 cp macos/Info.plist "$APP/Contents/Info.plist"
 cp macos/Widget/Info.plist "$WIDGET/Contents/Info.plist"
 for plist in "$APP/Contents/Info.plist" "$WIDGET/Contents/Info.plist"; do
