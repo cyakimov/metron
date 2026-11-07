@@ -14,6 +14,8 @@ The existing `metron` terminal formula continues independently.
 After the first app release and its cask pull request are merged, installation will be:
 
 ```sh
+brew tap cyakimov/tap
+brew trust --cask cyakimov/tap/metron-app
 brew install --cask cyakimov/tap/metron-app
 open -a Metron
 ```

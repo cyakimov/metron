@@ -26,6 +26,7 @@ jobs:
         uses: Homebrew/actions/git-user-config@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
 
       - run: brew tap cyakimov/tap
+      - run: brew trust --formula cyakimov/tap/metron
 
       # A cross-repo PAT is required both to push to the tap and because PRs
       # opened with GITHUB_TOKEN do not trigger the tap's CI.

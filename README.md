@@ -12,6 +12,8 @@ Illustrative values; the actual rows come from each provider.
 macOS with Homebrew:
 
 ```sh
+brew tap cyakimov/tap
+brew trust --formula cyakimov/tap/metron
 brew install cyakimov/tap/metron
 ```
 
