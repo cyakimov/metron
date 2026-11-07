@@ -21,3 +21,26 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build ./...
+
+  macos-app:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Swift logic and native layout checks
+        run: bash macos/test.sh
+      - name: Build and verify universal DMG
+        env:
+          VERSION: 0.1.0
+        run: |
+          bash macos/package.sh
+          app=dist/macos/Metron.app
+          for arch in arm64 x86_64; do
+            xcrun lipo "$app/Contents/MacOS/Metron" -verify_arch "$arch"
+            xcrun lipo "$app/Contents/MacOS/metron-helper" -verify_arch "$arch"
+            xcrun lipo "$app/Contents/PlugIns/MetronWidget.appex/Contents/MacOS/MetronWidget" -verify_arch "$arch"
+          done
+          codesign --verify --deep --strict "$app"

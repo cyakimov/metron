@@ -1,0 +1,114 @@
+name: macOS app release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable release tag (for example v0.1.3)
+        required: true
+
+permissions: {}
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Validate version
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Use a stable release tag such as v0.1.3" >&2
+            exit 1
+          fi
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+      - name: Validate Go and native app
+        run: |
+          go vet ./...
+          go test -race ./...
+          bash macos/test.sh
+      - name: Build and package universal app
+        run: bash macos/package.sh
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --generate-notes --draft
+          fi
+          gh release upload "$TAG" \
+            "dist/macos/Metron-$VERSION-universal.dmg" \
+            "dist/macos/Metron-$VERSION-universal.dmg.sha256"
+          gh release edit "$TAG" --draft=false
+
+  cask:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: cyakimov/homebrew-tap
+          path: tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          persist-credentials: false
+      - name: Prepare cask pull request
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Use a stable release tag such as v0.1.3" >&2
+            exit 1
+          fi
+          version="${TAG#v}"
+          gh release download "$TAG" --repo cyakimov/metron \
+            --pattern "Metron-$version-universal.dmg.sha256" --dir "$RUNNER_TEMP"
+          sha256=$(awk '{print $1}' "$RUNNER_TEMP/Metron-$version-universal.dmg.sha256")
+          if [[ ! "$sha256" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "Release checksum is invalid" >&2
+            exit 1
+          fi
+          printf 'Install Metron %s from its universal DMG.\n\nThe app is ad-hoc signed and not notarized; macOS may require first-launch approval.\n' \
+            "$version" > "$RUNNER_TEMP/metron-cask-pr.md"
+          gh auth setup-git
+          cd tap
+          branch="cask-metron-app-$version"
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null; then
+            if ! gh pr view "$branch" --repo cyakimov/homebrew-tap >/dev/null 2>&1; then
+              gh pr create --repo cyakimov/homebrew-tap --base main --head "$branch" \
+                --title "metron-app $version" --body-file "$RUNNER_TEMP/metron-cask-pr.md"
+            fi
+            exit 0
+          fi
+          git switch -c "$branch"
+          mkdir -p Casks
+          sed -e "s/@VERSION@/$version/g" -e "s/@SHA256@/$sha256/g" \
+            "$GITHUB_WORKSPACE/macos/metron-app.rb.in" > Casks/metron-app.rb
+          git add Casks/metron-app.rb
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "metron-app $version"
+          git push origin "$branch"
+          gh pr create --repo cyakimov/homebrew-tap --base main --head "$branch" \
+            --title "metron-app $version" --body-file "$RUNNER_TEMP/metron-cask-pr.md"
