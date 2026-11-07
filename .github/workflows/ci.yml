@@ -32,11 +32,11 @@ jobs:
           cache: true
       - name: Swift logic and native layout checks
         run: bash macos/test.sh
-      - name: Build and verify universal app
+      - name: Build and verify universal DMG
         env:
-          ARCHS: arm64 x86_64
+          VERSION: 0.1.0
         run: |
-          bash macos/build.sh
+          bash macos/package.sh
           app=dist/macos/Metron.app
           for arch in arm64 x86_64; do
             xcrun lipo "$app/Contents/MacOS/Metron" -verify_arch "$arch"
