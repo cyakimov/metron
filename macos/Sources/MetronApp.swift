@@ -7,6 +7,7 @@ import Combine
     let monitor = Monitor()
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
+    private var popoverEventMonitors: [Any] = []
     private var preferences: NSWindow?
     private var subscription: AnyCancellable?
     private let layout = PopoverLayout()
@@ -15,7 +16,7 @@ import Combine
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover)
         statusItem.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        popover.behavior = .transient
+        popover.behavior = .applicationDefined
         popover.animates = false
         popover.delegate = self
         popover.contentViewController = NSHostingController(rootView: MonitoredDashboard(monitor: monitor, layout: layout, showSettings: { [weak self] in self?.showPreferences() }, resize: { [weak self] size in
@@ -54,8 +55,51 @@ import Combine
             }
         }
     }
-    func popoverDidShow(_ notification: Notification) { layout.finishOpening() }
-    func popoverDidClose(_ notification: Notification) { layout.finishOpening() }
+    func popoverDidShow(_ notification: Notification) {
+        layout.finishOpening()
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: clicks.union(.keyDown)) { [weak self] event in
+            guard let self else { return event }
+            return self.handlePopoverEvent(event)
+        }
+        let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: clicks) { [weak self] _ in
+            self?.dismissPopover()
+        }
+        popoverEventMonitors = [localMonitor, globalMonitor].compactMap { $0 }
+    }
+
+    private func handlePopoverEvent(_ event: NSEvent) -> NSEvent? {
+        guard let window = popover.contentViewController?.view.window else { return event }
+        if event.type == .keyDown {
+            if event.window === window, event.charactersIgnoringModifiers == "\u{1B}" {
+                dismissPopover()
+                return nil
+            }
+            return event
+        }
+        if event.window === window { return event }
+        if event.type == .leftMouseDown, let button = statusItem.button,
+           let buttonWindow = button.window, event.window === buttonWindow,
+           button.bounds.contains(button.convert(event.locationInWindow, from: nil)) {
+            return event
+        }
+        dismissPopover()
+        return event
+    }
+
+    private func dismissPopover() {
+        if popover.isShown { popover.performClose(nil) }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        for monitor in popoverEventMonitors {
+            NSEvent.removeMonitor(monitor)
+        }
+        popoverEventMonitors.removeAll()
+        layout.finishOpening()
+    }
+
+    func applicationDidResignActive(_ notification: Notification) { dismissPopover() }
     func application(_ application: NSApplication, open urls: [URL]) {
         if !popover.isShown { togglePopover() }
     }
